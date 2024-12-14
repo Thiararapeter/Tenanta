@@ -1,116 +1,148 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../models/tenant.dart';
 
 class TenantListItem extends StatelessWidget {
   final Tenant tenant;
-  final VoidCallback onTap;
-  final VoidCallback onDelete;
+  final VoidCallback? onTap;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const TenantListItem({
-    super.key,
+    Key? key,
     required this.tenant,
-    required this.onTap,
-    required this.onDelete,
-  });
+    this.onTap,
+    this.onEdit,
+    this.onDelete,
+  }) : super(key: key);
 
-  Color _getStatusColor(PaymentStatus status) {
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'N/A';
+    return DateFormat('MMM d, y').format(date);
+  }
+
+  String _formatCurrency(double amount) {
+    return NumberFormat.currency(symbol: '\$').format(amount);
+  }
+
+  Color _getPaymentStatusColor(PaymentStatus status) {
     switch (status) {
       case PaymentStatus.upToDate:
         return Colors.green;
-      case PaymentStatus.pending:
+      case PaymentStatus.late:
         return Colors.orange;
       case PaymentStatus.overdue:
         return Colors.red;
+      case PaymentStatus.pending:
+        return Colors.grey;
     }
-  }
-
-  String _getStatusText(PaymentStatus status) {
-    return status.toString().split('.').last;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Dismissible(
-      key: Key(tenant.id),
-      background: Container(
-        color: Colors.red,
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 16),
-        child: const Icon(Icons.delete, color: Colors.white),
-      ),
-      direction: DismissDirection.endToStart,
-      confirmDismiss: (direction) async {
-        return await showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: const Text('Delete Tenant'),
-              content: Text('Are you sure you want to delete ${tenant.name}?'),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                ),
-              ],
-            );
-          },
-        );
-      },
-      onDismissed: (direction) => onDelete(),
-      child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: ListTile(
-          onTap: onTap,
-          leading: CircleAvatar(
-            child: Text(tenant.name[0].toUpperCase()),
-          ),
-          title: Text(tenant.name),
-          subtitle: Column(
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: InkWell(
+        onTap: onTap ?? onEdit,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(tenant.email),
-              Text(tenant.phoneNumber),
-              Text(
-                tenant.propertyTitle,
-                style: const TextStyle(
-                  fontStyle: FontStyle.italic,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    tenant.name,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  if (onDelete != null)
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Delete Tenant'),
+                            content: Text('Are you sure you want to delete ${tenant.name}?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  onDelete!();
+                                },
+                                child: const Text('Delete'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                ],
               ),
-            ],
-          ),
-          trailing: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '\$${tenant.rentAmount.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.phone, size: 16),
+                  const SizedBox(width: 8),
+                  Text(tenant.phoneNumber),
+                ],
               ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Icon(Icons.email, size: 16),
+                  const SizedBox(width: 8),
+                  Text(tenant.email),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Room ID: ${tenant.roomId}',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              Text(
+                'Property ID: ${tenant.propertyId}',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _getStatusColor(tenant.paymentStatus).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  color: _getPaymentStatusColor(tenant.paymentStatus).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  _getStatusText(tenant.paymentStatus),
+                  tenant.paymentStatus.toString().split('.').last,
                   style: TextStyle(
-                    color: _getStatusColor(tenant.paymentStatus),
-                    fontSize: 12,
+                    color: _getPaymentStatusColor(tenant.paymentStatus),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
+              const SizedBox(height: 8),
+              Text(
+                'Move In: ${_formatDate(tenant.moveInDate)}',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              if (tenant.moveOutDate != null)
+                Text(
+                  'Move Out: ${_formatDate(tenant.moveOutDate)}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              const SizedBox(height: 8),
+              Text(
+                'Rent: ${_formatCurrency(tenant.rentAmount)}',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
-          isThreeLine: true,
         ),
       ),
     );

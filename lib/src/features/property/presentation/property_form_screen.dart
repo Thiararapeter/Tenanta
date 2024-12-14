@@ -20,9 +20,9 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _rentController = TextEditingController();
+  final _locationController = TextEditingController();
   final _cityController = TextEditingController();
-  final _addressController = TextEditingController();
+  final _stateController = TextEditingController();
   final _supabase = Supabase.instance.client;
   bool _isLoading = false;
   String? _imageUrl;
@@ -34,9 +34,9 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
     if (widget.property != null) {
       _titleController.text = widget.property!.title;
       _descriptionController.text = widget.property!.description;
-      _rentController.text = widget.property!.rent.toString();
-      _cityController.text = widget.property!.city;
-      _addressController.text = widget.property!.address;
+      _locationController.text = widget.property!.location;
+      _cityController.text = widget.property!.city ?? '';
+      _stateController.text = widget.property!.state ?? '';
       _imageUrl = widget.property!.imageUrls.isNotEmpty ? widget.property!.imageUrls.first : null;
     }
   }
@@ -45,9 +45,9 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _rentController.dispose();
+    _locationController.dispose();
     _cityController.dispose();
-    _addressController.dispose();
+    _stateController.dispose();
     super.dispose();
   }
 
@@ -118,29 +118,36 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
   }
 
   Future<void> _saveProperty() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_titleController.text.isEmpty ||
+        _locationController.text.isEmpty ||
+        _descriptionController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill in all required fields'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final imageUrl = await _uploadImage();
       final propertyData = {
-        'title': _titleController.text,
+        'name': _titleController.text,
         'description': _descriptionController.text,
-        'rent': double.parse(_rentController.text),
-        'city': _cityController.text,
-        'address': _addressController.text,
-        'image_urls': imageUrl != null ? [imageUrl] : [],
-        'owner_id': _supabase.auth.currentUser!.id,
+        'location': _locationController.text,
+        'city': _cityController.text.isEmpty ? null : _cityController.text,
+        'state': _stateController.text.isEmpty ? null : _stateController.text,
+        'user_id': _supabase.auth.currentUser!.id,
+        'images': [],
       };
 
       if (widget.property == null) {
-        // Create new property
         await _supabase.from('properties').insert(propertyData);
       } else {
-        // Update existing property
         await _supabase
             .from('properties')
             .update(propertyData)
@@ -177,165 +184,65 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.property == null ? 'Add Property' : 'Edit Property'),
-      ),
-      body: Form(
+    return AlertDialog(
+      title: Text(widget.property == null ? 'Add Property' : 'Edit Property'),
+      content: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            TextFormField(
-              controller: _titleController,
-              decoration: const InputDecoration(
-                labelText: 'Title',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a title';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a description';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _rentController,
-              decoration: const InputDecoration(
-                labelText: 'Rent',
-                border: OutlineInputBorder(),
-                prefixText: '\$ ',
-              ),
-              keyboardType: TextInputType.number,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter the rent amount';
-                }
-                if (double.tryParse(value) == null) {
-                  return 'Please enter a valid number';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _cityController,
-              decoration: const InputDecoration(
-                labelText: 'City',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter the city';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _addressController,
-              decoration: const InputDecoration(
-                labelText: 'Address',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter the address';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Property Image',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            if (_imageUrl != null || _newImage != null) ...[
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  Container(
-                    height: 200,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: _newImage != null
-                          ? kIsWeb
-                              ? Image.network(
-                                  _newImage!.path,
-                                  fit: BoxFit.cover,
-                                )
-                              : Image.file(
-                                  File(_newImage!.path),
-                                  fit: BoxFit.cover,
-                                )
-                          : Image.network(
-                              _imageUrl!,
-                              fit: BoxFit.cover,
-                            ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: IconButton(
-                      icon: const Icon(Icons.close),
-                      color: Colors.white,
-                      onPressed: () {
-                        setState(() {
-                          _newImage = null;
-                          _imageUrl = null;
-                        });
-                      },
-                    ),
-                  ),
-                ],
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _titleController,
+                decoration: const InputDecoration(labelText: 'Property Name'),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter a property name';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
-            ],
-            ElevatedButton.icon(
-              onPressed: _pickImage,
-              icon: const Icon(Icons.add_photo_alternate),
-              label: Text(_imageUrl != null || _newImage != null
-                  ? 'Change Image'
-                  : 'Add Image'),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _saveProperty,
-                child: _isLoading
-                    ? const CircularProgressIndicator()
-                    : Text(
-                        widget.property == null ? 'Add Property' : 'Save Changes',
-                      ),
+              TextFormField(
+                controller: _locationController,
+                decoration: const InputDecoration(labelText: 'Location'),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter a location';
+                  }
+                  return null;
+                },
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(labelText: 'Description'),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _cityController,
+                decoration: const InputDecoration(labelText: 'City (Optional)'),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _stateController,
+                decoration: const InputDecoration(labelText: 'State (Optional)'),
+              ),
+            ],
+          ),
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: _saveProperty,
+          child: Text(widget.property == null ? 'Add' : 'Save'),
+        ),
+      ],
     );
   }
 }

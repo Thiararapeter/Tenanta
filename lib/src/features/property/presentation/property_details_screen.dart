@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../room/presentation/room_list_screen.dart';
 import '../domain/property.dart';
+import 'property_form_screen.dart';
 
 class PropertyDetailsScreen extends StatefulWidget {
   final String propertyId;
@@ -74,6 +75,21 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_property!.title),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PropertyFormScreen(
+                    property: _property,
+                  ),
+                ),
+              ).then((_) => _loadProperty());
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -104,9 +120,10 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const Divider(),
-                    _buildDetailRow('Address', '${_property!.city}, ${_property!.address}'),
+                    _buildDetailRow('Location', _property!.location),
+                    _buildDetailRow('City', _property!.city ?? 'Not specified'),
+                    _buildDetailRow('State', _property!.state ?? 'Not specified'),
                     _buildDetailRow('Description', _property!.description),
-                    _buildDetailRow('Rent', '\$${_property!.rent.toStringAsFixed(2)}'),
                   ],
                 ),
               ),

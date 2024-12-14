@@ -1,27 +1,55 @@
 import 'package:flutter/material.dart';
+import 'package:json_annotation/json_annotation.dart';
 
-enum PaymentStatus {
-  upToDate,
+part 'tenant.g.dart';
+
+enum TenantStatus {
+  active,
+  inactive,
   pending,
-  overdue,
+  evicted
 }
 
+enum PaymentStatus {
+  @JsonValue('upToDate')
+  upToDate,
+  @JsonValue('late')
+  late,
+  @JsonValue('overdue')
+  overdue,
+  @JsonValue('pending')
+  pending
+}
+
+@JsonSerializable(explicitToJson: true)
 class Tenant {
   final String id;
+  final String userId;
   final String propertyId;
+  final String roomId;
   final String name;
   final String email;
+  @JsonKey(name: 'phone_number')
   final String phoneNumber;
+  @JsonKey(name: 'rent_amount')
   final double rentAmount;
+  @JsonKey(name: 'payment_status', defaultValue: PaymentStatus.pending)
   final PaymentStatus paymentStatus;
+  @JsonKey(name: 'move_in_date', fromJson: _dateFromJson)
   final DateTime moveInDate;
+  @JsonKey(name: 'move_out_date', fromJson: _dateFromJson)
   final DateTime? moveOutDate;
   final String? notes;
-  final Map<String, dynamic>? property;
+  @JsonKey(name: 'created_at', fromJson: _dateFromJson)
+  final DateTime createdAt;
+  @JsonKey(name: 'updated_at', fromJson: _dateFromJson)
+  final DateTime updatedAt;
 
-  Tenant({
+  const Tenant({
     required this.id,
+    required this.userId,
     required this.propertyId,
+    required this.roomId,
     required this.name,
     required this.email,
     required this.phoneNumber,
@@ -30,43 +58,52 @@ class Tenant {
     required this.moveInDate,
     this.moveOutDate,
     this.notes,
-    this.property,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
-  factory Tenant.fromJson(Map<String, dynamic> json) {
+  factory Tenant.fromJson(Map<String, dynamic> json) => _$TenantFromJson(json);
+
+  Map<String, dynamic> toJson() => _$TenantToJson(this);
+
+  static DateTime _dateFromJson(dynamic date) {
+    if (date == null) return DateTime.now();
+    if (date is String) return DateTime.parse(date);
+    if (date is DateTime) return date;
+    throw ArgumentError('Invalid date format');
+  }
+
+  Tenant copyWith({
+    String? id,
+    String? userId,
+    String? propertyId,
+    String? roomId,
+    String? name,
+    String? email,
+    String? phoneNumber,
+    double? rentAmount,
+    PaymentStatus? paymentStatus,
+    DateTime? moveInDate,
+    DateTime? moveOutDate,
+    String? notes,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
     return Tenant(
-      id: json['id'],
-      propertyId: json['property_id'],
-      name: json['name'],
-      email: json['email'],
-      phoneNumber: json['phone_number'],
-      rentAmount: (json['rent_amount'] as num).toDouble(),
-      paymentStatus: PaymentStatus.values.firstWhere(
-        (e) => e.toString().split('.').last.toLowerCase() == json['payment_status'].toString().toLowerCase(),
-        orElse: () => PaymentStatus.pending,
-      ),
-      moveInDate: DateTime.parse(json['move_in_date']),
-      moveOutDate: json['move_out_date'] != null ? DateTime.parse(json['move_out_date']) : null,
-      notes: json['notes'],
-      property: json['properties'] as Map<String, dynamic>?,
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      propertyId: propertyId ?? this.propertyId,
+      roomId: roomId ?? this.roomId,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      rentAmount: rentAmount ?? this.rentAmount,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      moveInDate: moveInDate ?? this.moveInDate,
+      moveOutDate: moveOutDate ?? this.moveOutDate,
+      notes: notes ?? this.notes,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'property_id': propertyId,
-      'name': name,
-      'email': email,
-      'phone_number': phoneNumber,
-      'rent_amount': rentAmount,
-      'payment_status': paymentStatus.toString().split('.').last.toLowerCase(),
-      'move_in_date': moveInDate.toIso8601String(),
-      'move_out_date': moveOutDate?.toIso8601String(),
-      'notes': notes,
-    };
-  }
-
-  String get propertyTitle => property?['title'] ?? 'Unknown Property';
-  String get propertyAddress => property?['address'] ?? '';
 }

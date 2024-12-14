@@ -91,54 +91,26 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _signIn() async {
+  Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      final supabase = Supabase.instance.client;
-      
-      final response = await supabase.auth.signInWithPassword(
+      await Supabase.instance.client.auth.signInWithPassword(
         email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        password: _passwordController.text,
       );
 
-      if (!mounted) return;
-
-      if (response.user != null && response.session != null) {
-        // Store session securely
-        await supabase.auth.setSession(response.session!.refreshToken!);
-        
-        _showSuccessSnackBar('Welcome back! Signing you in...');
-        
-        // Navigate to dashboard
-        if (!mounted) return;
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => const DashboardScreen(),
-          ),
-        );
-      } else {
-        _showErrorSnackBar('Login failed. Please check your credentials and try again.');
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/dashboard');
+        _showSuccessSnackBar('Successfully logged in!');
       }
-    } on AuthException catch (error) {
-      _showErrorSnackBar(_getAuthErrorMessage(error.message));
-    } on FormatException catch (error) {
-      _showErrorSnackBar('There was a problem connecting to the server. Please try again.');
-    } on Exception catch (error) {
-      if (error.toString().contains('network')) {
-        _showErrorSnackBar('Unable to connect. Please check your internet connection.');
-      } else {
-        _showErrorSnackBar('An unexpected error occurred. Please try again.');
-      }
+    } catch (error) {
+      _showErrorSnackBar('Failed to login: ${error.toString()}');
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -265,7 +237,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           onFieldSubmitted: (_) {
                             _passwordFocusNode.unfocus();
                             if (!_isLoading) {
-                              _signIn();
+                              _handleLogin();
                             }
                           },
                           validator: (value) {
@@ -286,7 +258,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: _isLoading ? null : _signIn,
+                          onPressed: _isLoading ? null : _handleLogin,
                           style: ElevatedButton.styleFrom(
                             foregroundColor: Colors.white,
                             backgroundColor: Theme.of(context).primaryColor,

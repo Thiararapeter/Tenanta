@@ -1,5 +1,4 @@
 // ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:image_picker_for_web/image_picker_for_web.dart';
 import 'package:url_launcher_web/url_launcher_web.dart';

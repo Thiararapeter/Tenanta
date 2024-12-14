@@ -1,84 +1,69 @@
+import 'package:json_annotation/json_annotation.dart';
+
+part 'property.g.dart';
+
+@JsonSerializable(explicitToJson: true)
 class Property {
+  @JsonKey(defaultValue: '')
   final String id;
-  final String ownerId;
+  @JsonKey(name: 'user_id', defaultValue: '')
+  final String userId;
+  @JsonKey(name: 'name', defaultValue: '')
   final String title;
+  @JsonKey(defaultValue: '')
   final String description;
-  final double rent;
-  final String? caretakerId;
-  final String city;
-  final String address;
+  @JsonKey(defaultValue: '')
+  final String location;
+  @JsonKey(defaultValue: null)
+  final String? city;
+  @JsonKey(defaultValue: null)
+  final String? state;
+  @JsonKey(name: 'images', defaultValue: [])
   final List<String> imageUrls;
+  @JsonKey(name: 'created_at', fromJson: _dateFromJson)
   final DateTime createdAt;
+  @JsonKey(name: 'updated_at', fromJson: _dateFromJson)
   final DateTime updatedAt;
 
   Property({
     required this.id,
-    required this.ownerId,
+    required this.userId,
     required this.title,
     required this.description,
-    required this.rent,
-    this.caretakerId,
-    required this.city,
-    required this.address,
+    required this.location,
+    this.city,
+    this.state,
     required this.imageUrls,
     required this.createdAt,
     required this.updatedAt,
   });
 
-  factory Property.fromJson(Map<String, dynamic> json) {
-    return Property(
-      id: json['id'] as String,
-      ownerId: json['owner_id'] as String,
-      title: json['title'] as String,
-      description: json['description'] as String,
-      rent: (json['rent'] as num).toDouble(),
-      caretakerId: json['caretaker_id'] as String?,
-      city: json['city'] as String,
-      address: json['address'] as String,
-      imageUrls: List<String>.from(json['image_urls'] as List),
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
-    );
-  }
+  factory Property.fromJson(Map<String, dynamic> json) => _$PropertyFromJson(json);
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'owner_id': ownerId,
-      'title': title,
-      'description': description,
-      'rent': rent,
-      'caretaker_id': caretakerId,
-      'city': city,
-      'address': address,
-      'image_urls': imageUrls,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
-    };
-  }
+  Map<String, dynamic> toJson() => _$PropertyToJson(this);
+
+  static DateTime _dateFromJson(String date) => DateTime.parse(date);
 
   Property copyWith({
     String? id,
-    String? ownerId,
+    String? userId,
     String? title,
     String? description,
-    double? rent,
-    String? caretakerId,
+    String? location,
     String? city,
-    String? address,
+    String? state,
     List<String>? imageUrls,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
     return Property(
       id: id ?? this.id,
-      ownerId: ownerId ?? this.ownerId,
+      userId: userId ?? this.userId,
       title: title ?? this.title,
       description: description ?? this.description,
-      rent: rent ?? this.rent,
-      caretakerId: caretakerId ?? this.caretakerId,
+      location: location ?? this.location,
       city: city ?? this.city,
-      address: address ?? this.address,
+      state: state ?? this.state,
       imageUrls: imageUrls ?? this.imageUrls,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

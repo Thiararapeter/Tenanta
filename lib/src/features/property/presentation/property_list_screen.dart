@@ -73,11 +73,18 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
     }
   }
 
+  void _showPropertyForm([Property? property]) {
+    showDialog(
+      context: context,
+      builder: (context) => PropertyFormScreen(property: property),
+    ).then((_) => _loadProperties());
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Properties'),
+        title: const Text('Properties'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -92,153 +99,62 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const PropertyFormScreen(),
-                            ),
-                          ).then((_) => _loadProperties());
-                        },
+                        onPressed: () => _showPropertyForm(),
                         icon: const Icon(Icons.add),
                         label: const Text('Add Property'),
                       ),
                     ],
                   ),
                 )
-              : RefreshIndicator(
-                  onRefresh: _loadProperties,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _properties.length,
-                    itemBuilder: (context, index) {
-                      final property = _properties[index];
-                      return Card(
-                        child: InkWell(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => PropertyDetailsScreen(
-                                  propertyId: property.id,
-                                ),
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _properties.length,
+                  itemBuilder: (context, index) {
+                    final property = _properties[index];
+                    return Card(
+                      child: ListTile(
+                        title: Text(property.title),
+                        subtitle: Text('Location: ${property.location}'),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PropertyDetailsScreen(
+                                propertyId: property.id,
                               ),
-                            ).then((_) => _loadProperties());
-                          },
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (property.imageUrls.isNotEmpty)
-                                SizedBox(
-                                  height: 200,
-                                  width: double.infinity,
-                                  child: Image.network(
-                                    property.imageUrls.first,
-                                    fit: BoxFit.cover,
+                            ),
+                          ).then((_) => _loadProperties());
+                        },
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => PropertyFormScreen(
+                                      property: property,
+                                    ),
                                   ),
-                                ),
-                              Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      property.title,
-                                      style: Theme.of(context).textTheme.titleLarge,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Rent: \$${property.rent.toStringAsFixed(2)}',
-                                      style: Theme.of(context).textTheme.titleMedium,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      '${property.city}, ${property.address}',
-                                      style: Theme.of(context).textTheme.bodyMedium,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        TextButton.icon(
-                                          onPressed: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) =>
-                                                    PropertyFormScreen(
-                                                  property: property,
-                                                ),
-                                              ),
-                                            ).then((_) => _loadProperties());
-                                          },
-                                          icon: const Icon(Icons.edit),
-                                          label: const Text('Edit'),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        TextButton.icon(
-                                          onPressed: () => showDialog(
-                                            context: context,
-                                            builder: (context) => AlertDialog(
-                                              title: const Text('Delete Property'),
-                                              content: const Text(
-                                                'Are you sure you want to delete this property?',
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(context),
-                                                  child: const Text('Cancel'),
-                                                ),
-                                                TextButton(
-                                                  onPressed: () {
-                                                    Navigator.pop(context);
-                                                    _deleteProperty(property.id);
-                                                  },
-                                                  child: const Text(
-                                                    'Delete',
-                                                    style: TextStyle(
-                                                      color: Colors.red,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          icon: const Icon(
-                                            Icons.delete,
-                                            color: Colors.red,
-                                          ),
-                                          label: const Text(
-                                            'Delete',
-                                            style: TextStyle(color: Colors.red),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
+                                ).then((_) => _loadProperties());
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete),
+                              onPressed: () => _deleteProperty(property.id),
+                            ),
+                          ],
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
-      floatingActionButton: _properties.isNotEmpty
-          ? FloatingActionButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PropertyFormScreen(),
-                  ),
-                ).then((_) => _loadProperties());
-              },
-              child: const Icon(Icons.add),
-            )
-          : null,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showPropertyForm(),
+        child: const Icon(Icons.add),
+      ),
     );
   }
 }

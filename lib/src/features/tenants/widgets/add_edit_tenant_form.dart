@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/tenant.dart';
+import '../../property/domain/property.dart';
+import '../../rooms/models/room.dart';
 
 class AddEditTenantForm extends StatefulWidget {
   final Tenant? tenant;
-  final Function(Tenant) onSave;
+  final Function(Map<String, dynamic>) onSave;
 
   const AddEditTenantForm({
-    super.key,
+    Key? key, 
     this.tenant,
     required this.onSave,
-  });
+  }) : super(key: key);
 
   @override
   State<AddEditTenantForm> createState() => _AddEditTenantFormState();
@@ -17,62 +20,95 @@ class AddEditTenantForm extends StatefulWidget {
 
 class _AddEditTenantFormState extends State<AddEditTenantForm> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nameController;
-  late TextEditingController _emailController;
-  late TextEditingController _phoneController;
-  late TextEditingController _rentAmountController;
-  late DateTime _moveInDate;
-  DateTime? _moveOutDate;
-  late PaymentStatus _paymentStatus;
-  late TextEditingController _notesController;
+  final _supabase = Supabase.instance.client;
+  
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _rentAmountController = TextEditingController();
+  final _notesController = TextEditingController();
+
+  bool _isLoading = true;
+  List<Property> _properties = [];
+  List<Room> _availableRooms = [];
   String? _selectedPropertyId;
+  String? _selectedRoomId;
+  DateTime _moveInDate = DateTime.now();
+  DateTime? _moveOutDate;
+  String _paymentStatus = 'upToDate';
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.tenant?.name);
-    _emailController = TextEditingController(text: widget.tenant?.email);
-    _phoneController = TextEditingController(text: widget.tenant?.phoneNumber);
-    _rentAmountController = TextEditingController(
-      text: widget.tenant?.rentAmount.toString(),
-    );
-    _moveInDate = widget.tenant?.moveInDate ?? DateTime.now();
-    _moveOutDate = widget.tenant?.moveOutDate;
-    _paymentStatus = widget.tenant?.paymentStatus ?? PaymentStatus.upToDate;
-    _notesController = TextEditingController(text: widget.tenant?.notes);
-    _selectedPropertyId = widget.tenant?.propertyId;
+    _loadProperties();
+    if (widget.tenant != null) {
+      _nameController.text = widget.tenant!.name;
+      _emailController.text = widget.tenant!.email;
+      _phoneController.text = widget.tenant!.phoneNumber;
+      _rentAmountController.text = widget.tenant!.rentAmount.toString();
+      _notesController.text = widget.tenant!.notes ?? '';
+      _selectedPropertyId = widget.tenant!.propertyId;
+      _selectedRoomId = widget.tenant!.roomId;
+      _moveInDate = widget.tenant!.moveInDate;
+      _moveOutDate = widget.tenant!.moveOutDate;
+      _paymentStatus = widget.tenant!.paymentStatus.toString().split('.').last;
+    }
   }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
-    _rentAmountController.dispose();
-    _notesController.dispose();
-    super.dispose();
-  }
+  Future<void> _loadProperties() async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return;
 
-  Future<void> _selectDate(BuildContext context, bool isMoveIn) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: isMoveIn ? _moveInDate : (_moveOutDate ?? DateTime.now()),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) {
+      final response = await _supabase
+          .from('properties')
+          .select()
+          .eq('user_id', userId);
+
       setState(() {
-        if (isMoveIn) {
-          _moveInDate = picked;
-        } else {
-          _moveOutDate = picked;
-        }
+        _properties = (response as List<dynamic>)
+            .map((data) => Property.fromJson(Map<String, dynamic>.from(data)))
+            .toList();
+        _isLoading = false;
       });
+
+      if (_selectedPropertyId != null) {
+        _loadAvailableRooms(_selectedPropertyId!);
+      }
+    } catch (e) {
+      print('Error loading properties: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadAvailableRooms(String propertyId) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final response = await _supabase
+          .from('rooms')
+          .select('*, property:properties(*)')
+          .eq('property_id', propertyId)
+          .eq('user_id', userId)
+          .or('status.eq.available,id.eq.${_selectedRoomId ?? ''}');
+
+      setState(() {
+        _availableRooms = (response as List<dynamic>)
+            .map((data) => Room.fromJson(Map<String, dynamic>.from(data)))
+            .toList();
+      });
+    } catch (e) {
+      print('Error loading rooms: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       child: Form(
@@ -131,28 +167,63 @@ class _AddEditTenantFormState extends State<AddEditTenantForm> {
                 },
               ),
               const SizedBox(height: 16),
-              // TODO: Add property selection dropdown
-              // FutureBuilder<List<Property>>(
-              //   future: _loadProperties(),
-              //   builder: (context, snapshot) {
-              //     return DropdownButtonFormField<String>(
-              //       value: _selectedPropertyId,
-              //       items: snapshot.data
-              //           ?.map((property) => DropdownMenuItem(
-              //                 value: property.id,
-              //                 child: Text(property.title),
-              //               ))
-              //           .toList(),
-              //       onChanged: (value) {
-              //         setState(() => _selectedPropertyId = value);
-              //       },
-              //       decoration: const InputDecoration(
-              //         labelText: 'Property',
-              //         border: OutlineInputBorder(),
-              //       ),
-              //     );
-              //   },
-              // ),
+              DropdownButtonFormField<String>(
+                value: _selectedPropertyId,
+                decoration: const InputDecoration(
+                  labelText: 'Property',
+                  border: OutlineInputBorder(),
+                ),
+                items: _properties.map((property) {
+                  return DropdownMenuItem(
+                    value: property.id,
+                    child: Text(property.title),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedPropertyId = value;
+                    _selectedRoomId = null;
+                    if (value != null) {
+                      _loadAvailableRooms(value);
+                    }
+                  });
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please select a property';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _selectedRoomId,
+                decoration: const InputDecoration(
+                  labelText: 'Room',
+                  border: OutlineInputBorder(),
+                ),
+                items: _availableRooms.map((room) {
+                  return DropdownMenuItem(
+                    value: room.id,
+                    child: Text('Room ${room.roomNumber} - \$${room.rentAmount.toStringAsFixed(2)}'),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedRoomId = value;
+                    if (value != null) {
+                      final selectedRoom = _availableRooms.firstWhere((room) => room.id == value);
+                      _rentAmountController.text = selectedRoom.rentAmount.toString();
+                    }
+                  });
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please select a room';
+                  }
+                  return null;
+                },
+              ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _rentAmountController,
@@ -161,13 +232,10 @@ class _AddEditTenantFormState extends State<AddEditTenantForm> {
                   border: OutlineInputBorder(),
                   prefixText: '\$',
                 ),
-                keyboardType: TextInputType.number,
+                enabled: false, // Rent amount is auto-filled from selected room
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter rent amount';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Please enter a valid number';
+                    return 'Please select a room to set rent amount';
                   }
                   return null;
                 },
@@ -176,34 +244,68 @@ class _AddEditTenantFormState extends State<AddEditTenantForm> {
               Row(
                 children: [
                   Expanded(
-                    child: ListTile(
-                      title: const Text('Move-in Date'),
-                      subtitle: Text(
-                        '${_moveInDate.year}-${_moveInDate.month}-${_moveInDate.day}',
-                      ),
-                      onTap: () => _selectDate(context, true),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Move-in Date'),
+                        TextButton(
+                          onPressed: () async {
+                            final date = await showDatePicker(
+                              context: context,
+                              initialDate: _moveInDate,
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (date != null) {
+                              setState(() => _moveInDate = date);
+                            }
+                          },
+                          child: Text(
+                            _moveInDate.toString().split(' ')[0],
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   Expanded(
-                    child: ListTile(
-                      title: const Text('Move-out Date'),
-                      subtitle: Text(
-                        _moveOutDate != null
-                            ? '${_moveOutDate!.year}-${_moveOutDate!.month}-${_moveOutDate!.day}'
-                            : 'Not set',
-                      ),
-                      onTap: () => _selectDate(context, false),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Move-out Date'),
+                        TextButton(
+                          onPressed: () async {
+                            final date = await showDatePicker(
+                              context: context,
+                              initialDate: _moveOutDate ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (date != null) {
+                              setState(() => _moveOutDate = date);
+                            }
+                          },
+                          child: Text(
+                            _moveOutDate?.toString().split(' ')[0] ?? 'Not set',
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              DropdownButtonFormField<PaymentStatus>(
+              DropdownButtonFormField<String>(
                 value: _paymentStatus,
-                items: PaymentStatus.values
+                decoration: const InputDecoration(
+                  labelText: 'Payment Status',
+                  border: OutlineInputBorder(),
+                ),
+                items: ['upToDate', 'pending', 'overdue']
                     .map((status) => DropdownMenuItem(
                           value: status,
-                          child: Text(status.toString().split('.').last),
+                          child: Text(status),
                         ))
                     .toList(),
                 onChanged: (value) {
@@ -211,10 +313,6 @@ class _AddEditTenantFormState extends State<AddEditTenantForm> {
                     setState(() => _paymentStatus = value);
                   }
                 },
-                decoration: const InputDecoration(
-                  labelText: 'Payment Status',
-                  border: OutlineInputBorder(),
-                ),
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -227,30 +325,41 @@ class _AddEditTenantFormState extends State<AddEditTenantForm> {
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (_formKey.currentState!.validate()) {
-                    // TODO: Create actual tenant object and save
-                    // final tenant = Tenant(
-                    //   id: widget.tenant?.id ?? '',
-                    //   propertyId: _selectedPropertyId!,
-                    //   name: _nameController.text,
-                    //   email: _emailController.text,
-                    //   phoneNumber: _phoneController.text,
-                    //   rentAmount: double.parse(_rentAmountController.text),
-                    //   paymentStatus: _paymentStatus,
-                    //   moveInDate: _moveInDate,
-                    //   moveOutDate: _moveOutDate,
-                    //   notes: _notesController.text,
-                    // );
-                    // widget.onSave(tenant);
+                    final tenantData = {
+                      'name': _nameController.text,
+                      'email': _emailController.text,
+                      'phone_number': _phoneController.text,
+                      'property_id': _selectedPropertyId,
+                      'room_id': _selectedRoomId,
+                      'rent_amount': double.parse(_rentAmountController.text),
+                      'move_in_date': _moveInDate.toIso8601String(),
+                      'move_out_date': _moveOutDate?.toIso8601String(),
+                      'payment_status': _paymentStatus,
+                      'notes': _notesController.text,
+                      'user_id': _supabase.auth.currentUser!.id,
+                    };
+
+                    widget.onSave(tenantData);
                   }
                 },
-                child: const Text('Save Tenant'),
+                child: Text(widget.tenant == null ? 'Save Tenant' : 'Update Tenant'),
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _rentAmountController.dispose();
+    _notesController.dispose();
+    super.dispose();
   }
 }
